@@ -3,6 +3,7 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
 
 # Table of contents
 - [1. Phylogeny](#1-phylogeny)
+  - [A. Filter adaptors from raw reads](#A-Filter-adaptors-from-raw-reads)
 
 
 # 1. Phylogeny 
