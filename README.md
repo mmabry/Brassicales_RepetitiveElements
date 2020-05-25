@@ -471,6 +471,62 @@ java -jar /home/mmabry/software/ASTRAL_III/Astral/astral.5.6.1.jar -i Brassicale
 # 4. Hierarchical Clustering
 
 # 5. Ultrametric Tree 
+## A. Concatenate alignments using the 'concatenate_matrices.py' script from https://bitbucket.org/washjake/transcriptome_phylogeny_tools/src/master/ 
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5  # partition
+#SBATCH -J ConcatMatrix  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80G #memory
+
+export PYTHONPATH="/home/mmabry/software/biopython-1.68/":$PYTHONPATH
+export PATH="/home/mmabry/software/phyutility/":$PATH
+
+python /home/mmabry/software/washjake-transcriptome_phylogeny_tools-1d8e6439be95/concatenate_matrices.py 1404Alignments 5 2 aa BrassicalesREconcatMatrix
+```
+## B. Run RAxML to optimize Branch lengths and model parameters using the concatenated alignment and ASTRAL phylogeny as a fixed input tree.
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J RAxML  # give the job a custom name
+#SBATCH -o RAxML-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 24  # number of cores (AKA tasks)
+#SBATCH --mem=80G #memory
+
+export PATH=/home/mmabry/software/standard-RAxML/:$PATH
+
+raxmlHPC-PTHREADS -T 24 -f e -p 12345 -m PROTCATWAG -q BrassicalesREconcatMatrix.model -s BrassicalesREconcatMatrix.phy -t ../RepElem_Brassicales_ASTRAL.tre -n ConcatBrassicalesRE -o Moringa_sp_Moringa_sp,Carica_sp_Carica_sp 
+```
+## C. Use TreePL to time calibrate phylogeny
+```txt
+treefile = RAxML_result.ConcatBrassicalesRE.tre
+smooth = 1000
+numsites = 765087
+mrca = PALAEOCLEOME Aethionema_arabicum_Aethionema_arabicum Cleome_violaceae_Cleome_violaceae
+min = PALAEOCLEOME 47.8
+max = PALAEOCLEOME 52.58
+mrca = DRESSIANTHA Carica_sp_Carica_sp Batis_maritima_Batis_maritima
+min = DRESSIANTHA 89.9
+max = DRESSIANTHA 98.78
+outfile = BrassicalesRE.dated.tre
+thorough
+#prime
+opt = 2
+moredetail
+optad = 2
+moredetailad
+optcvad = 2
+moredetailcvad
+```
 
 # 6. Bayou
 ```R
