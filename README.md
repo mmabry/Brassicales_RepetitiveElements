@@ -2,7 +2,8 @@
 Scripts used for Repetitive element content not correlated with whole-genome duplication or reflect phylogeny in the Brassicales (In prep)
 
 #1. Filter adaptors from raw reads
-'''bash
+
+```bash
 #! /bin/bash
 
 #SBATCH -J TrimAdapt
@@ -20,4 +21,4 @@ export PATH=/home/mmabry/scratch/ncbi-blast-2.5.0+/bin/:$PATH
 
 
 python /home/mmabry/yangya-phylogenomic_dataset_construction-489685700c2a/filter_fastq.py Cleomella_serrulata_JHall_R1.fastq Cleomella_serrulata_JHall_R2.fastq /home/mmabry/yangya-phylogenomic_dataset_construction-489685700c2a/data/UniVec-TruSeq_adapters 2
-'''
+```
