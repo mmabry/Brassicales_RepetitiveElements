@@ -568,7 +568,158 @@ plotBranchHeatMap(tree, chainOU, "theta", burnin = 0.3, pal = viridis, edge.widt
 phenogram.density(tree, dat, burnin = 0.3, chainOU, pp.cutoff = 0.3)
 ```
 
-# 7. Owie 
+# 7. Owie : Example from from http://www.phytools.org/Cordoba2017/ex/10/Multi-regime.html
+```R
+library(phytools)
+```
+```R
+##set working directory
+setwd("/Users/mem2c2/OneDrive - University of Missouri/Computer/Projects/BrassicalesRE/")
 
+tree <- ladderize(read.tree("treePL/BrassicalesRE.dated.tre"))
+
+tree <- drop.tip(tree, c("Cleomella_serrulata_Cleomella_serrulata"))
+
+##for Brassicaceae family tree
+tree <- extract.clade(tree, 78)
+
+##for Cleomaceae family tree
+tree <- extract.clade(tree, 122)
+
+##for BMAP taxa
+tree <- keep.tip(tree, c("Aethionema_arabicum_Aethionema_arabicum", "Cakile_maritima_Cakile_maritima", "Caulanthus_amplexicaulis_Caulanthus_amplexicaulis", 
+"Crambe_hispanica_Crambe_hispanica" , "Descurania_pinnata_Descurania_pinnata" , "Descurainia_sophioides_Descurainia_sophioides", 
+"Diptychocarpus_strictus_Diptychocarpus_strictus", "Eruca_vesicaria_Eruca_vesicaria" , "Euclidium_syriacum_Euclidium_syriacum", 
+"Iberis_amara_Iberis_amara", "Isatis_tinctoria_Isatis_tinctoria", "Lepidium_sativum_Lepidium_sativum", "Lunaria_annua_Lunaria", 
+"Malcomia_maritima_Malcomia_maritima", "Myagrum_perfoliatum_Myagrum_perfoliatum", "Rorippa_islandica_Rorippa_islandica", "Sinapis_alba_Sinapis_alba", 
+"Stanleya_pinnata_Stanleya_pinnata", "Thlaspi_arvense_Thlaspi_arvense"))
+
+##for data
+df <- read.csv("data.summary2.csv")
+df <- df[df$Species %in% tree$tip.label, ]
+
+plot(tree, cex = 0.5)
+
+##Seletion regime for testing atAlpha vs all other Brassicales
+atAlpha <- as.vector(df$Atalpha)
+names(atAlpha) <- df$Species
+
+atAlphaTree <- make.simmap(tree, atAlpha, model="ER")
+plot(atAlphaTree)
+
+##Seletion regime for testing thAlpha vs all other Cleomeaceae
+Thalpha <-as.vector(df$Thalpha)
+names(Thalpha) <- df$Species
+
+ThalphaTree <- make.simmap(tree, Thalpha, model="ER")
+plot(ThalphaTree)
+
+##Seletion regime for testing Brassiceae vs all other Brassicaceae
+Brassiceae <-as.vector(df$Brassiceae)
+names(Brassiceae) <- df$Species
+
+BrassiceaeTree <- make.simmap(tree, Brassiceae, model="ER")
+plot(BrassiceaeTree)
+
+##Seletion regime for testing only known ploidy of BMAP taxa
+Neo <- as.vector(c("Diploid",
+                   "NeoPolyploid",
+                   "NeoPolyploid",
+                   "NeoPolyploid",
+                   "NeoPolyploid",
+                   "Diploid",
+                   "Diploid",
+                   "NeoPolyploid",
+                   "Diploid", 
+                   "NeoPolyploid",
+                   "NeoPolyploid",
+                   "NeoPolyploid",
+                   "NeoPolyploid", 
+                   "Diploid",
+                   "Diploid",
+                   "Diploid",
+                   "NeoPolyploid", 
+                   "Diploid",
+                   "Diploid"))
+names(Neo) <- c("Aethionema_arabicum_Aethionema_arabicum",
+                "Cakile_maritima_Cakile_maritima",
+                "Caulanthus_amplexicaulis_Caulanthus_amplexicaulis",
+                "Crambe_hispanica_Crambe_hispanica",
+                "Descurania_pinnata_Descurania_pinnata",
+                "Descurainia_sophioides_Descurainia_sophioides",
+                "Diptychocarpus_strictus_Diptychocarpus_strictus",
+                "Eruca_vesicaria_Eruca_vesicaria",
+                "Euclidium_syriacum_Euclidium_syriacum", 
+                "Iberis_amara_Iberis_amara",
+                "Isatis_tinctoria_Isatis_tinctoria",
+                "Lepidium_sativum_Lepidium_sativum",
+                "Lunaria_annua_Lunaria", 
+                "Malcomia_maritima_Malcomia_maritima",
+                "Myagrum_perfoliatum_Myagrum_perfoliatum",
+                "Rorippa_islandica_Rorippa_islandica",
+                "Sinapis_alba_Sinapis_alba", 
+                "Stanleya_pinnata_Stanleya_pinnata",
+                "Thlaspi_arvense_Thlaspi_arvense")
+
+NeoTree <- make.simmap(tree, Neo, model="ER")
+plot(NeoTree)
+
+
+##Setting data
+TEs <- as.vector(df$Total_RE)
+names(TEs) <- df$Species
+
+Gypsy <- as.vector(df$Gypsy)
+names(Gypsy) <- df$Species
+
+Copia <- as.vector(df$Copia)
+names(Copia) <- df$Species
+```
+```R
+install.packages("OUwie")
+library(OUwie)
+
+##change depending on which selection regime is being used
+OU_df<-data.frame(df$Species, atAlpha, TEs)
+OU_df<-data.frame(df$Species, atAlpha, Gypsy)
+OU_df<-data.frame(df$Species, atAlpha, Copia)
+
+##change tree depending on which selection regime is being used
+
+#Ornstein-Uhlenbeck model with different state means and a single alpha and sigma^2 acting all selective regimes
+fitOUM<-OUwie(atAlphaTree, OU_df,model="OUM",simmap.tree=TRUE) 
+fitOUM
+
+#Ornstein-Uhlenbeck model with a single optimum for all species 
+fitOU1<-OUwie(atAlphaTree, OU_df,model="OU1",simmap.tree=TRUE) 
+fitOU1
+
+#single-rate Brownian motion
+fitBM1<-OUwie(atAlphaTree, OU_df,model="BM1",simmap.tree=TRUE) 
+fitBM1
+
+#Brownian motion with different rate parameters for each state on a tree
+fitBMS<-OUwie(atAlphaTree, OU_df,model="BMS",simmap.tree=TRUE, root.station=FALSE) 
+fitBMS
+
+#new Ornstein-Uhlenbeck models that assume different state means as well as multiple sigma^2
+fitOUMV<-OUwie(atAlphaTree, OU_df,model="OUMV",simmap.tree=TRUE) 
+fitOUMV
+
+#new Ornstein-Uhlenbeck models that assume different state means as well as multiple alpha
+fitOUMA<-OUwie(atAlphaTree, OU_df,model="OUMA",simmap.tree=TRUE) 
+fitOUMA
+
+#new Ornstein-Uhlenbeck models that assume different state means as well as multiple alpha and sigma^2 per selective regime 
+fitOUMVA<-OUwie(atAlphaTree, OU_df,model="OUMVA",simmap.tree=TRUE) 
+fitOUMVA
+
+#gather AICc scores
+ouwie_aicc<-c(fitOUM$AICc, fitOU1$AICc, fitBM1$AICc, fitBMS$AICc, fitOUMV$AICc, fitOUMA$AICc, fitOUMVA$AICc)
+names(ouwie_aicc)<-c("fitOUM","fitOU1","fitBM1", "fitBMS",  "fitOUMV", "fitOUMA", "fitOUMVA")
+
+#determine which one is weighted highest for all tests run
+aic.w(ouwie_aicc)
+```
 
 
