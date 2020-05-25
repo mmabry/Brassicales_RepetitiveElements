@@ -473,6 +473,100 @@ java -jar /home/mmabry/software/ASTRAL_III/Astral/astral.5.6.1.jar -i Brassicale
 # 5. Ultrametric Tree 
 
 # 6. Bayou
+```R
+install_github("uyedaj/bayou")
+library(bayou)
+library(viridis)
+```
+```R
+##set working directory
+setwd("/Users/mem2c2/OneDrive - University of Missouri/Computer/Projects/BrassicalesRE/")
+
+####Simulating a multi-optima OU process on a phylogeny
+
+##get Brassicales RE tree from treePL
+tree <- ladderize(read.tree("treePL/BrassicalesRE.dated.tre"))
+
+tree <- drop.tip(tree, c("Cleomella_serrulata_Cleomella_serrulata")) ## we do not have RE data for this one :(
+
+##for Brassicaceae family tree
+tree <- extract.clade(tree, 77)
+
+##for Cleomaceae family tree
+tree <- extract.clade(tree, 122)
+
+##forjust BMAP taxa
+tree <- keep.tip(tree, c("Aethionema_arabicum_Aethionema_arabicum",
+"Cakile_maritima_Cakile_maritima", 
+"Caulanthus_amplexicaulis_Caulanthus_amplexicaulis", 
+"Crambe_hispanica_Crambe_hispanica",
+"Descurania_pinnata_Descurania_pinnata", 
+"Descurainia_sophioides_Descurainia_sophioides",
+"Diptychocarpus_strictus_Diptychocarpus_strictus",
+"Eruca_vesicaria_Eruca_vesicaria",
+"Euclidium_syriacum_Euclidium_syriacum",
+"Iberis_amara_Iberis_amara",
+"Isatis_tinctoria_Isatis_tinctoria",
+"Lepidium_sativum_Lepidium_sativum",
+"Lunaria_annua_Lunaria",
+"Malcomia_maritima_Malcomia_maritima",
+"Myagrum_perfoliatum_Myagrum_perfoliatum",
+"Rorippa_islandica_Rorippa_islandica",
+"Sinapis_alba_Sinapis_alba",
+"Stanleya_pinnata_Stanleya_pinnata",
+"Thlaspi_arvense_Thlaspi_arvense"))
+
+
+##for any tree do the following
+tree <- reorder(tree, "postorder")
+
+plot(tree, cex = 0.5)
+
+##get RE data
+df <- read.csv("data.summary2.csv")
+
+df <- df[df$Species %in% tree$tip.label, ]
+
+## change Total_RE to Copia or Gypsy when using those.
+dat <- as.vector(df$Total_RE)
+names(dat) <- df$Species
+
+hist(dat)
+
+###make priors
+priorOU <- make.prior(tree, dists=list(dalpha="dlnorm", 
+                                       dsig2="dlnorm",
+                                       dk="cdpois", 
+                                       dtheta="dnorm", 
+                                       dsb = "dsb"), 
+                    param=list(dalpha=list(), 
+                               dsig2=list(), 
+                               dk=list(lambda=1,kmax=2*length(tree$tip.label)-2),
+                               dtheta=list(mean=mean(dat), sd=2*sd(dat))))
+
+###initiate the MCMC chain with some starting values
+startpars <- priorSim(priorOU, tree, plot=TRUE)$pars[[1]]
+priorOU(startpars)
+
+mcmcOU <- bayou.makeMCMC(tree, dat, prior=priorOU, 
+                         new.dir=TRUE, outname="modelOU_RE", plot.freq=NULL) # Set up the MCMC
+mcmcOU$run(1000000) # Run the MCMC
+
+###full MCMC results are written to a set of files
+chainOU <- mcmcOU$load()
+
+###We can set a "burnin" parameter that tells the package coda to discard the first bit of the chain
+chainOU <- set.burnin(chainOU, 0.3)
+summary(chainOU)
+plot(chainOU, auto.layout=FALSE)
+dev.off()
+
+###check out results vs truth
+#par(mfrow=c(3,1))
+plotSimmap.mcmc(chainOU, burnin = 0.3, lwd = 2, pp.cutoff = 0.3, pal = viridis, circle.col = "#33638DFF")
+plotBranchHeatMap(tree, chainOU, "theta", burnin = 0.3, pal = viridis, edge.width = 2)
+phenogram.density(tree, dat, burnin = 0.3, chainOU, pp.cutoff = 0.3)
+```
 
 # 7. Owie 
 
