@@ -1,7 +1,7 @@
 ## Brassicales_RepetitiveElements
 Scripts used for Repetitive element content not correlated with whole-genome duplication or reflect phylogeny in the Brassicales (In prep)
-
-# 1. Filter adaptors from raw reads
+# 1. Phylogeny 
+## A. Filter adaptors from raw reads
 ```bash
 #! /bin/bash
 
@@ -22,7 +22,7 @@ export PATH=/home/mmabry/scratch/ncbi-blast-2.5.0+/bin/:$PATH
 python /home/mmabry/yangya-phylogenomic_dataset_construction-489685700c2a/filter_fastq.py Cleomella_serrulata_JHall_R1.fastq Cleomella_serrulata_JHall_R2.fastq /home/mmabry/yangya-phylogenomic_dataset_construction-489685700c2a/data/UniVec-TruSeq_adapters 2
 ```
 
-# 2. Run Trinity *note: this also trims to remove poor quality reads
+## B. Run Trinity *note: this also trims to remove poor quality reads
 ```bash
 #! /bin/bash
 
@@ -45,7 +45,7 @@ module load tbb/tbb-4.4.4
 Trinity --seqType fq --trimmomatic --quality_trimming_params 'SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25' --max_memory 80G --CPU 12 --full_cleanup --output Cleomella_serrulata_JHall.trinity --left Brassicales_RNA_RawReads/Cleomella_serrulata_JHall_R1.fastq.filtered --right Brassicales_RNA_RawReads/Cleomella_serrulata_JHall_R2.fastq.filtered
 ```
 
-# 3. BUSCO check for Transcriptome completeness
+## C. BUSCO check for Transcriptome completeness
 #### install busco https://gitlab.com/ezlab/busco/blob/master/BUSCO_v3_userguide.pdf
 #### make sure paths are correct in config file, use command below to get correct path
 ```bash
@@ -92,7 +92,7 @@ module load python/python-2.7.13
 
 python /home/mmabry/scratch/busco/scripts/generate_plot.py -wd /home/mmabry/scratch/BUSCO_summaries
 ```
-# 4. Translate assembled transcriptomes to amino acids for downstream analyses
+## D. Translate assembled transcriptomes to amino acids for downstream analyses
 #### download and unzip TransDecoder, build it by typing make in the base installation directiory
 ```bash
 wget https://github.com/TransDecoder/TransDecoder/archive/v3.0.1.tar.gz
@@ -135,7 +135,7 @@ export PATH=/home/mmabry/software/TransDecoder-3.0.1/:$PATH
 
 for file in *.fasta; do /home/mmabry/software/TransDecoder-3.0.1/TransDecoder.Predict -t ${file}; done
 ```
-# 5. Rename files
+## E. Rename files
 #### remane all transcriptomes from transdecoder (*.pep file) to species_name.faa and then run script renameSeq.py to rename all transcripts species_name_1, species_name_2, species_name_3...etc
 ```python
 #!/usr/bin/env python
@@ -157,7 +157,7 @@ with open(fn) as f:
 ```bash
 for file in *.faa; do python RenameSeqs.py $file > Fixed_names/$file; done
 ```
-# 6. Run OrthoFinder to determine OrthoGroups
+## F. Run OrthoFinder to determine OrthoGroups
 #### first run it using diamond to get groups
 ```bash
 #! /bin/bash
@@ -213,7 +213,7 @@ export PATH=/home/mmabry/software/:$PATH #this is for running diamond and FastTr
 
 /home/mmabry/software/OrthoFinder-2.2.6/OrthoFinder/orthofinder/orthofinder.py -fg /storage/htc/pireslab/mmabry_htc/Brassicales_Transcriptomes_aa/FixedNames/renameSeq/Family_level/Capparidaceae/Results_Feb13/ -M msa -t 56 -ot
 ```
-# 7. Filter alignments by taxa occupancy https://github.com/MU-IRCF/filter_by_ortho_group
+## G. Filter alignments by taxa occupancy https://github.com/MU-IRCF/filter_by_ortho_group
 ```perl
 #!/usr/bin/env perl
 use v5.10;
@@ -281,7 +281,7 @@ module load perl/perl-5.26.2-intel
 for file in *.fa; do perl filter_by_ortho_group.pl $file 56; done &> movelog_filter_by_ortho_group &
 ```
 
-# 8. Filter alignments based on quality/gaps https://github.com/MU-IRCF/filter_by_gap_fraction
+## H. Filter alignments based on quality/gaps https://github.com/MU-IRCF/filter_by_gap_fraction
 ```perl
 #!/usr/bin/env perl
 use v5.10;
@@ -355,13 +355,13 @@ module load perl/perl-5.26.2-intel
 for file in *.fa; do perl /storage/htc/biocompute/scratch/mmabry/filter_by_alignment_quality/filter_by_alignment_quality $file 0.4 ; done &> movelog_quality0.4_final &
 ```
 
-# 9. Rename headers for PhylotreePruner (in later in the steps) before running first set of trees
+## I. Rename headers for PhylotreePruner (in later in the steps) before running first set of trees
 ```bash
 srun --pty -p Interactive -c2 --mem 4G /bin/bash  #this works if I do not want to be on the head node, specifically on Lewis
 for file in *.fa; do sed -e "s/\(.*\)_/\1@/g" $file > PTP_fixedNames/$file ; done
 ```
 
-# 10. Run RAxML for tree inference
+## J. Run RAxML for tree inference
 ```bash
 #! /bin/bash
 
@@ -386,7 +386,7 @@ raxmlHPC-PTHREADS -T 14 -f a -N 100 -p 12345 -x 12345 -n "${file2}.tre" -s "${fi
 for file in /storage/htc/pireslab/mmabry_htc/Brassicales_Transcriptomes_aa/FixedNames/renameSeq/Family_level/Brassicaceae/Results_Feb13/Orthologues_Feb15/Alignments/FilteredTaxaAlignments/AlignmentsFilteredByQuality/PTP_fixedNames/*.fa; do sbatch RAxML.sh ${file}; done
 ```
 
-# 11. PhyloTreePruner
+## K. PhyloTreePruner
 ```bash
 #! /bin/bash
 
@@ -414,7 +414,7 @@ for file in /storage/htc/pireslab/mmabry_htc/Brassicales_Transcriptomes_aa/Fixed
 for file in *.fa; do cat $file | cut -f1 -d '@' > ${file}_cut.fa; done
 ```
 
-# 12. Finally, run RAxML one more time to get final gene trees
+## L. Finally, run RAxML one more time to get final gene trees
 ```bash
 #! /bin/bash
 
@@ -439,7 +439,7 @@ raxmlHPC-PTHREADS -T 14 -f a -N 100 -p 12345 -x 12345 -n "${file2}.tre" -s "${fi
 for file in /storage/htc/pireslab/mmabry_htc/Brassicales_Transcriptomes_aa/FixedNames/renameSeq/Family_level/Res_Bat_Mor_Car/Results_Feb13/Orthologues_Feb13_1/Alignments/FilteredTaxaAlignments/AlignmentsFilteredByQuality/PTP_fixedNames/FinalGeneTreeAlignments/*.fa_cut.fa; do sbatch RAxML.sh ${file}; done
 ```
 
-# 13. Species tree inference with ASTRAL
+## M. Species tree inference with ASTRAL
 
 #### in the folder with the besttree from RAxML run this to make a file with all the trees in one
 ```bash
@@ -463,6 +463,18 @@ module load java/openjdk/java-1.8.0-openjdk
 java -jar /home/mmabry/software/ASTRAL_III/Astral/astral.5.6.1.jar -i Brassicales.tre -t 2 -o Brassicales_Discordance_ASTRAL.tre
 ```
 
+
+# 2. Repetitive Element Clustering
+
+# 3. Regression Analyses
+
+# 4. Hierarchical Clustering
+
+# 5. Ultrametric Tree 
+
+# 6. Bayou
+
+# 7. Owie 
 
 
 
