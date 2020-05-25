@@ -2,7 +2,6 @@
 Scripts used for Repetitive element content not correlated with whole-genome duplication or reflect phylogeny in the Brassicales (In prep)
 
 # 1. Filter adaptors from raw reads
-
 ```bash
 #! /bin/bash
 
@@ -24,7 +23,6 @@ python /home/mmabry/yangya-phylogenomic_dataset_construction-489685700c2a/filter
 ```
 
 # 2. Run Trinity *note: this also trims to remove poor quality reads
-#### download and un tar the latest version of trinity
 ```bash
 #! /bin/bash
 
@@ -53,4 +51,109 @@ Trinity --seqType fq --trimmomatic --quality_trimming_params 'SLIDINGWINDOW:4:5 
 ```bash
 module show <name of program> 
 #copy PATH and place it in config file
+```
+```bash
+#! /bin/bash
+
+#SBATCH -J BUSCO
+#SBATCH -o BUSCO.o%J
+#SBATCH -e BUSCO.e%J
+#SBATCH -N 1
+#SBATCH -n 14
+#SBATCH -p BioCompute,Lewis
+#SBATCH --account=biosci
+#SBATCH -t 2-00:00:00
+#SBATCH --mem=8000
+
+module load python/python-2.7.13
+
+python /home/mmabry/software/busco/scripts/run_BUSCO.py -i Cleomella_serrulata_JHall.trinity.Trinity.fasta -o Cleomella_serrulata -l /home/mmabry/software/busco/embryophyta_odb9 -m tran
+```
+
+#### Plot results
+```bash
+#create folder with all BUSCO_short_summaries
+cp run_05103/short_summary_05103.txt BUSCO_summaries/.
+```
+```bash
+#! /bin/bash
+
+#SBATCH -J plotBUSCO
+#SBATCH -o plotBUSCO.o%J
+#SBATCH -e plotBUSCO.e%J
+#SBATCH -N 1
+#SBATCH -n 14
+#SBATCH -p BioCompute,Lewis
+#SBATCH --account=biosci
+#SBATCH -t 2-00:00:00
+#SBATCH --mem=8000
+
+module load python/python-2.7.13
+
+python /home/mmabry/scratch/busco/scripts/generate_plot.py -wd /home/mmabry/scratch/BUSCO_summaries
+```
+# 4. Translate assembled transcriptomes to amino acids for downstream analyses
+#### download and unzip TransDecoder, build it by typing make in the base installation directiory
+```bash
+wget https://github.com/TransDecoder/TransDecoder/archive/v3.0.1.tar.gz
+tar -xvzf <filename>
+```
+#### first script use LongORFs
+```bash
+#! /bin/bash
+
+#SBATCH -J LongOrfs
+#SBATCH -o LongOrfs.o%J
+#SBATCH -e LongOrfs.e%J
+#SBATCH -N 1
+#SBATCH -n 14
+#SBATCH -p BioCompute,Lewis
+#SBATCH --account=biosci
+#SBATCH -t 2-00:00:00
+#SBATCH --mem=80000
+
+export PATH=/home/mmabry/software/TransDecoder-3.0.1/:$PATH
+
+for file in *.fasta; do /home/mmabry/software/TransDecoder-3.0.1/TransDecoder.LongOrfs -t ${file}; done
+```
+#### second script uses Predict
+```bash
+#! /bin/bash
+
+#SBATCH -J Predict
+#SBATCH -o Predict.o%J
+#SBATCH -e Predict.e%J
+#SBATCH -N 1
+#SBATCH -n 14
+#SBATCH -p BioCompute,Lewis
+#SBATCH --account=biosci
+#SBATCH -t 2-00:00:00
+#SBATCH --mem=8000
+
+
+export PATH=/home/mmabry/software/TransDecoder-3.0.1/:$PATH
+
+for file in *.fasta; do /home/mmabry/software/TransDecoder-3.0.1/TransDecoder.Predict -t ${file}; done
+```
+# 5. Rename files
+#### remane all transcriptomes from transdecoder to species_name.faa and then run script renameSeq.py to rename all transcripts species_name_1, species_name_2, species_name_3...etc
+```python
+#!/usr/bin/env python
+
+from __future__ import print_function
+from sys import argv
+
+fn = argv[1]
+SpeciesName = fn.split(".")[0]
+counter = 0
+with open(fn) as f:
+        for line in f:
+                if line[0] == '>':
+                        counter += 1
+                        print(">", SpeciesName, "_", counter, sep='')
+                else:
+                     	print(line.strip())
+```
+```bash
+for file in *.faa; do python RenameSeqs.py $file > Fixed_names/$file; done
 ```
