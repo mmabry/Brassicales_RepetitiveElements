@@ -21,7 +21,7 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
 - [4. Hierarchical Clustering](#4-Hierarchical-Clustering)
 - [5. Ultrametric Tree](#5-Ultrametric-Tree) 
   - [A. Concatenate alignments](#a-concatenate-alignments-using-the-concatenate_matricespy-script-from-httpsbitbucketorgwashjaketranscriptome_phylogeny_toolssrcmaster)
-  - [B. Run RAxML to optimize Branch lengths](#b-Run-RAxML-to-optimize-Branch-lengths-and-model-parameters-using-the-concatenated-alignment-and-ASTRAL-phylogeny-as-a-fixed-input-tree.)
+  - [B. Run RAxML to optimize Branch lengths](#b-run-raxml-to-optimize-branch-lengths-and-model-parameters-using-the-concatenated-alignment-and-astral-phylogeny-as-a-fixed-input-tree)
   - [C. Use TreePL to time calibrate phylogeny](#c-use-treepl-to-time-calibrate-phylogeny-httpsgithubcomblackrimtreeplwikiquick-run)
 - [6. Bayou](#6-bayou-httpsgithubcomuyedajbayoublobmastertutorialmd)
 - [7. Owie](#7-owie--example-from-from-httpwwwphytoolsorgcordoba2017ex10multi-regimehtml)
