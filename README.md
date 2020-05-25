@@ -4,6 +4,28 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
 # Table of contents
 - [1. Phylogeny](#1-phylogeny)
   - [A. Filter adaptors from raw reads](#A-Filter-adaptors-from-raw-reads)
+  - [B. Trinity](#B-Run-Trinity-*note:-this-also-trims-to-remove-poor-quality-reads)
+  - [C. BUSCO check for Transcriptome completeness](#C-BUSCO-check-for-Transcriptome-completeness)
+  - [D. Translate assembled transcriptomes](#D-Translate-assembled-transcriptomes-to-amino-acids-for-downstream-analyses)
+  - [E. Rename files](#E-Rename-files)
+  - [F. Run OrthoFinder to determine OrthoGroups](#F-Run-OrthoFinder-to-determine-OrthoGroups)
+  - [G. Filter alignments by taxa occupancy](#G-Filter-alignments-by-taxa-occupancy-https://github.com/MU-IRCF/filter_by_ortho_group)
+  - [H. Filter alignments based on quality/gaps](#H-Filter-alignments-based-on-quality/gaps https://github.com/MU-IRCF/filter_by_gap_fraction)
+  - [I. Rename headers for PhylotreePruner](#I-Rename-headers-for-PhylotreePruner-(in-later-in-the-steps)-before-running-first-set-of-trees)
+  - [J. Run RAxML for tree inference](#J-Run-RAxML-for-tree-inference)
+  - [K. PhyloTreePruner](#K-PhyloTreePruner)
+  - [L. Final gene tree estimation](#L-Finally,-run-RAxML-one-more-time-to-get-final-gene-trees)
+  - [M. Species tree inference with ASTRAL](#M-Species-tree-inference-with-ASTRAL)
+- [2. Repetitive Element Clustering](#2-Repetitive-Element-Clustering)
+- [3. Regression Analyses](#3-Regression-Analyses)
+- [4. Hierarchical Clustering](#4-Hierarchical-Clustering)
+- [5. Ultrametric Tree](#5-Ultrametric-Tree) 
+  - [A. Concatenate alignments](#A-Concatenate-alignments-using-the-'concatenate_matrices.py'-script-from-https://bitbucket.org/washjake/transcriptome_phylogeny_tools/src/master/)
+  - [B. Run RAxML to optimize Branch lengths](#B-Run-RAxML-to-optimize-Branch-lengths-and-model-parameters-using-the-concatenated-alignment-and-ASTRAL-phylogeny-as-a-fixed-input-tree.)
+  - [C. Use TreePL to time calibrate phylogeny](#C-Use-TreePL-to-time-calibrate-phylogeny-https://github.com/blackrim/treePL/wiki/Quick-run)
+- [6. Bayou](#6-Bayou-https://github.com/uyedaj/bayou/blob/master/tutorial.md)
+- [7. Owie](#7-Owie-:-Example-from-from-http://www.phytools.org/Cordoba2017/ex/10/Multi-regime.html)
+
 
 
 # 1. Phylogeny 
@@ -512,7 +534,8 @@ export PATH=/home/mmabry/software/standard-RAxML/:$PATH
 
 raxmlHPC-PTHREADS -T 24 -f e -p 12345 -m PROTCATWAG -q BrassicalesREconcatMatrix.model -s BrassicalesREconcatMatrix.phy -t ../RepElem_Brassicales_ASTRAL.tre -n ConcatBrassicalesRE -o Moringa_sp_Moringa_sp,Carica_sp_Carica_sp 
 ```
-## C. Use TreePL to time calibrate phylogeny
+## C. Use TreePL to time calibrate phylogeny https://github.com/blackrim/treePL/wiki/Quick-run
+#### First run the script below with thorough and prime, then run a second time with the prime options
 ```txt
 treefile = RAxML_result.ConcatBrassicalesRE.tre
 smooth = 1000
@@ -534,7 +557,7 @@ optcvad = 2
 moredetailcvad
 ```
 
-# 6. Bayou
+# 6. Bayou https://github.com/uyedaj/bayou/blob/master/tutorial.md
 ```R
 install_github("uyedaj/bayou")
 library(bayou)
