@@ -661,8 +661,226 @@ for f in *_COV55; do paste $f.total.txt $f.cluster.txt $f.theorethical.txt  $f.b
 for f in *temp; do awk '{print $0, FILENAME}' $f > $f.run.info.txt; done
 ```
 # 3. Regression Analyses
+#### Data formating:
+```R
+###Load necessary packages
+library(data.table)
+library(plyr)
+library(stringr)
+library(ggplot2)
+library(cowplot)
+#set working directory to the directory that contains *annotations_summary.tsv
+#Transposome output files and make a list of all the files
+setwd("A:/03-Brassicales RE analysis/")
+filesin= list.files(pattern="*.tsv")
+#Load the data from the files in the "filesin" list, 
+#only loading "Read_count", "Order" and "Superfamily" columns
+samplelist = lapply(filesin, fread, select = c(2,3,5), stringsAsFactors= FALSE)
+#Capture species names from file names
+spec<-sapply(sapply(filesin,function(a) strsplit(a, "[.]")[[1]][1]), 
+             function(b)paste(strsplit(b,"_")[[1]][1], strsplit(b,"_")[[1]][2], " "))
+spec<-sapply(spec, function(c)trimws(c, which="right"))
+names(samplelist)<-spec
+#If available, load species list in phylogenetic order
+spec.ordered<-read.delim("species.ordered.txt", header = F)
+names(spec.ordered)<-"Species"
+#Import metadata and capture information about number of reads per run from filenames
+metadata<-read.csv("metadata.csv")
+metadata<-join(spec.ordered,join(metadata, setNames
+                                 (data.frame(x=spec, y=paste(substr(sapply(filesin,function(a) strsplit(a, "[.]")[[1]][4]), 1, 3), "000",sep=""),
+                                             row.names = c()), c("Species", "Reads_per_run")), by = "Species"), by="Species")
+metadata$Reads_per_run<-as.numeric(as.character(metadata$Reads_per_run))
+metadata$Family[metadata$Species=="Cleomella serrulata"]<-"Cleomaceae"
+
+#*****************************************************************************************
+#Format and complie the data
+#*****************************************************************************************
+#Replace "unclassified" Superfamilies with "other" + the corresponding Order
+samplelist<-lapply(samplelist,function(c)cbind(c, RE_Superfamily=paste(c$Superfamily,c$Order,sep=".")))
+rsf<-function(t)
+{
+  t$RE_Superfamily<-str_replace_all(t$RE_Superfamily, "unclassified.", "other_")
+  t$RE_Superfamily<-sapply(t$RE_Superfamily,function(a)strsplit(a,"[.]")[[1]][1])
+  return(t)
+}
+samplelist<-lapply(samplelist, rsf)
+REmeta<-unique(rbindlist(samplelist)[,c("Order","RE_Superfamily")])
+REmeta<-REmeta[order(REmeta$Order)]
+#Sum up the reads for each RE Superfamily and combine data for all species into one data.frame
+samplelist<-lapply(samplelist, function(a)aggregate(data=a, GenomeFraction~RE_Superfamily, FUN=function(b)sum(b)))
+trans<-function(x)
+{
+  df<-as.data.frame(x$GenomeFraction, row.names=x$RE_Superfamily)
+  df<-as.data.frame(t(df))
+  return(df)
+}
+transList<-lapply(samplelist, trans)
+names(transList)<-spec
+REfrac<-rbindlist(transList, use.names = T, fill = T, idcol = "Species")
+REfrac[is.na(REfrac)]<-0
+REfrac$Total_RE<-rowSums(REfrac[,-1])
+REfrac<-join(metadata,REfrac, by = "Species")
+REfrac[is.na(REfrac)]<-0
+write.csv(REfrac, file = "data.summary.csv", row.names = F)
+```
+#### Regression analyses and plotting:
+```R
+###Figure 2###
+#Linear regression analysis dot plot
+#Firstly, make a regression plot for all samples
+regdf<-REfrac[REfrac$Genome_Size_Mbp>0& REfrac$Genome_Size_Mbp<1300,]
+regdf$Total_RE<-regdf$Total_RE*100
+reg <- lm(Total_RE~Genome_Size_Mbp, data = regdf)
+intercept <- format(reg$coefficients[[1]],digits =3)
+slope<- format(reg$coefficients[[2]], digits = 3)
+r2<- format(summary(reg)$r.squared, digits =3)
+allrp<-ggplot(regdf, aes(x= Genome_Size_Mbp, y = Total_RE,col =Family))+geom_point(shape=19)+
+  geom_smooth(data=subset(regdf, Family=="Brassicaceae"|Family=="Capparaceae"|Family=="Cleomaceae"), se = F, method = "lm", linetype = "dashed")+
+  stat_smooth(method = "lm", size =1, col = "Black")+
+  theme_bw()+
+  theme(axis.title.x = element_text(size=10), axis.title.y = element_text(size=10))+
+  xlab("Genome size (Mbp)")+ 
+  ylab("Repetitive elements' genome fraction (%)")+
+  scale_x_continuous(breaks = seq(0, 1500, by = 100))
+#Then, make regression plots for Copia or Gypsy elements
+resf<-split(do.call(rbind,samplelist), do.call(rbind,samplelist)$RE_Superfamily)
+resf<-lapply(resf, function(a)setDT(a, keep.rownames = "Species"))
+resf.format<-function(df)
+{
+  df[,"GenomeFraction"]<-df[,"GenomeFraction"]*100
+  df$Species<-sub("*\\.[0-9]","", df$Species)
+  sf<-unique(df$RE_Superfamily)
+  df<-join(metadata, df, by="Species")
+  df$RE_Superfamily<-rep(sf, nrow(df))
+  df[is.na(df)]<-0
+  return(df)
+}
+resf<-lapply(resf,resf.format)
+cp<-resf$Copia
+cp<-cp[cp$Genome_Size_Mbp>0 & cp$Genome_Size_Mbp<1300,]
+copiarp<- ggplot(cp, aes(x= Genome_Size_Mbp, y = GenomeFraction,col=Family))+geom_point(shape=19)+
+  geom_smooth(data=subset(cp, Family=="Brassicaceae"|Family=="Capparaceae"|Family=="Cleomaceae"), se = F, method = "lm", linetype = "dashed")+
+  stat_smooth(method = "lm", size =1, col = "Black")+
+  theme_bw()+ 
+  theme(legend.position = "none", axis.title.x = element_text(size=10), axis.title.y = element_text(size=10))+
+  xlab("Genome size (Mbp)")+ 
+  ylab("Repetitive elements' genome fraction (%)")+
+  scale_x_continuous(breaks = seq(0, 1500, by = 100))
+gp<-resf$Gypsy 
+gp<-gp[gp$Genome_Size_Mbp>0 & gp$Genome_Size_Mbp<1300,]
+gypsyrp<-ggplot(gp, aes(x= Genome_Size_Mbp, y = GenomeFraction,col=Family))+geom_point(shape=19)+
+  geom_smooth(data=subset(gp, Family=="Brassicaceae"|Family=="Capparaceae"|Family=="Cleomaceae"), se = F, method = "lm", linetype = "dashed")+
+  stat_smooth(method = "lm", size =1, col = "Black")+
+  theme_bw()+ 
+  theme(legend.position = "none", axis.title.x = element_text(size=10), axis.title.y = element_text(size=10))+
+  xlab("Genome size (Mbp)")+ 
+  ylab("Repetitive elements' genome fraction (%)")+
+  scale_x_continuous(breaks = seq(0, 1500, by = 100))
+#Combine Copia and Gypsi plot into a two apannel graph
+cgrp<-plot_grid(copiarp, gypsyrp, labels = c("B", "C"), nrow = 1)
+#Finally, combine all the plots into the final graph
+acgrp<-plot_grid(allrp, cgrp, labels = c("A"), ncol = 1)
+ggsave("Regression_plot.pdf", plot=acgrp, useDingbats=F)
+```
 
 # 4. Hierarchical Clustering
+#### *note: You will need to run the "Data formating" code from "3. Regression analyses" section prior to proceeding.
+```R
+###Load necessary packages
+library(ape)
+library(phytools)
+library(mergeTrees)
+library(dendextend)
+
+tree <- read.tree("RepElem_Brassicales.new")
+
+###Supplemental Figure 2###
+#Generate a tanglegram comparing ASTRAL phylogeny to hierarchical-clustering-infered dendrogram
+denddf<-REfrac[-c(3,63),c(1,2,5,6,ncol(REfrac))]
+denddf$Species<-sub(" ","_",denddf$Species)
+denddf[,3:5]<-denddf[,3:5]*100
+row.names(denddf)<-as.character(denddf$Species)
+denddf<-denddf[,-c(1,2)]
+denddflist<-lapply(denddf,as.data.frame, rownames(denddf))
+names(denddflist)<-names(denddf)
+distlist<-lapply(denddflist,dist)
+dendhclist<-lapply(distlist, hclust)
+consdend<-mergeTrees(dendhclist, standardize = FALSE)
+modtree<-drop.tip(tree, c("Cleomella_serrulata"))
+rtree<-rotateNodes(modtree, "all")
+pt<-as.dendrogram(rtree)
+cd<-as.dendrogram(consdend)
+dl<-dendlist(pt, cd)
+udl<-untangle(dl, method="step2side")
+pdf("Tanglegram_rotated_untangled.pdf", width = 10, height = 7)
+tanglegram(dl, fast=T)
+dev.off()
+
+###Supplemental Figure 3###
+#Generate a tanglegram comparing ASTRAL phylogeny to hierarchical-clustering-infered dendrogram
+#for Brassicaceae, Cleomaceae or Capparaceae families
+allfam<-REfrac[-c(3,63),c(1,2,5,6,ncol(REfrac))]
+allfam$Species<-sub(" ","_",allfam$Species)
+#Brassicaceae
+bra<-allfam[allfam$Family=="Brassicaceae",]
+bra[,3:5]<-bra[,3:5]*100
+row.names(bra)<-as.character(bra$Species)
+bra<-bra[,-c(1,2)]
+bralist<-lapply(bra,as.data.frame, rownames(bra))
+names(bralist)<-names(bra)
+bradist<-lapply(bralist,dist)
+brahc<-lapply(bradist, hclust)
+bradend<-mergeTrees(brahc, standardize = FALSE)
+bd<-as.dendrogram(bradend)
+bt<-extract.clade(rtree, 76)
+btd<-as.dendrogram(bt)
+bl<-dendlist(btd, bd)
+ubl<-untangle(bl, method="step2side")
+tanglegram(ubl, fast=T)
+pdf("Tanglegram_Brassicaceae.pdf", width = 10, height = 7)
+tanglegram(ubl, fast=T)
+dev.off()
+#Cleomaceae
+cle<-allfam[allfam$Family=="Cleomaceae",]
+cle[,3:5]<-cle[,3:5]*100
+row.names(cle)<-as.character(cle$Species)
+cle<-cle[,-c(1,2)]
+clelist<-lapply(cle,as.data.frame, rownames(cle))
+names(clelist)<-names(cle)
+cledist<-lapply(clelist,dist)
+clehc<-lapply(cledist, hclust)
+cledend<-mergeTrees(clehc, standardize = FALSE)
+cld<-as.dendrogram(cledend)
+clt<-extract.clade(rtree, 122)
+cltd<-as.dendrogram(clt)
+cll<-dendlist(cltd, cld)
+ucl<-untangle(cll, method="step2side")
+tanglegram(ucl, fast=T)
+pdf("Tanglegram_Cleomaceae.pdf", width = 10, height = 7)
+tanglegram(ucl, fast=T)
+dev.off()
+#Capparaceae
+cap<-allfam[allfam$Family=="Capparaceae",]
+cap[,3:5]<-cap[,3:5]*100
+row.names(cap)<-as.character(cap$Species)
+cap<-cap[,-c(1,2)]
+caplist<-lapply(cap,as.data.frame, rownames(cap))
+names(caplist)<-names(cap)
+capdist<-lapply(caplist,dist)
+caphc<-lapply(capdist, hclust)
+capdend<-mergeTrees(caphc, standardize = FALSE)
+cpd<-as.dendrogram(capdend)
+cpt<-extract.clade(rtree, 135)
+cpt<-rotate(cpt, 7)
+cptd<-as.dendrogram(cpt)
+cpl<-dendlist(cptd, cpd)
+tanglegram(cpl, fast=T)
+pdf("Tanglegram_Capparaceae.pdf", width = 10, height = 7)
+tanglegram(cpl, fast=T)
+dev.off()
+#NOTE:the 3 plots can be combined into single graph using plot_grid or other
+#functions, but we combined them manually in Adobe Illustrator
+```
 
 # 5. Ultrametric Tree 
 ## A. Concatenate alignments using the 'concatenate_matrices.py' script from https://bitbucket.org/washjake/transcriptome_phylogeny_tools/src/master/ 
