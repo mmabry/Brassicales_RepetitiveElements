@@ -693,9 +693,6 @@ metadata<-join(spec.ordered,join(metadata, setNames
 metadata$Reads_per_run<-as.numeric(as.character(metadata$Reads_per_run))
 metadata$Family[metadata$Species=="Cleomella serrulata"]<-"Cleomaceae"
 
-#*****************************************************************************************
-#Format and complie the data
-#*****************************************************************************************
 #Replace "unclassified" Superfamilies with "other" + the corresponding Order
 samplelist<-lapply(samplelist,function(c)cbind(c, RE_Superfamily=paste(c$Superfamily,c$Order,sep=".")))
 rsf<-function(t)
@@ -1194,6 +1191,7 @@ aic.w(ouwie_aicc)
 # 8. Other plots
 #### First run the "Data formating" code from "Regression analyses" section.
 ```R
+###Load necessary packages
 library(scales)
 library(RColorBrewer)
 library(stats)
