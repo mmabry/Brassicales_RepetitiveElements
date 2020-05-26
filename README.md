@@ -493,7 +493,168 @@ java -jar /home/mmabry/software/ASTRAL_III/Astral/astral.5.6.1.jar -i Brassicale
 
 
 # 2. Repetitive Element Clustering
+## A. Removal of mitochondrial and chloroplast reads
+#### For more information about the databases used see Appendix2 of the manuscript.
+#### Identification of plastid reads:
+```perl
+#!/usr/bin/perl
+use strict;
+use warnings;
+	
+my @species;
+						
+#Making list of all the analyzed species
+open IN, "<", "raw.files.fasta.txt";
+while (<IN>) 
+{	
+	chomp;
+	my ($file) = split /\s+/, $_;
+	push @species, $file;
+}
+close IN;
 
+print "\nMaking blast database for Brassicales_chloroplast_genomes_NCBI.fa\n";
+system ("makeblastdb -dbtype nucl -in Brassicales_chloroplast_genomes_NCBI.fa -out Brassicales_chloroplast_genomes_NCBI.fa");
+
+print "\nMaking blast database for Brassicales_mitochondrial_genomes_NCBI.fa\n";
+system ("makeblastdb -dbtype nucl -in Brassicales_mitochondrial_genomes_NCBI.fa -out Brassicales_mitochondrial_genomes_NCBI.fa");
+
+#Doing blast search of candidate shotgun sequencing reads against a database of 
+#NCBI available Brassicales chloroplast and mitochondrial genomes
+#(https://www.ncbi.nlm.nih.gov/nuccore)
+foreach my $spec (@species)
+{
+	my $sample = $spec;
+	$sample =~ s/_R1.*//;
+	print "Copy $spec into temp_c.fa file.\n";
+	system ("cp $spec temp.fa");
+	print "Format the temp.fa file.\n";
+	my $sub = 's/\t/\n/g';
+	system ("sed -i '$sub' temp.fa");
+	print "Doing blast search of $spec against Brassicales_chloroplast_genomes_NCBI.fa\n";
+	system ("blastn -query temp.fa -db Brassicales_chloroplast_genomes_NCBI.fa -num_threads 24 -max_target_seqs 1 -out $sample.match.chloroplast.genome.txt  -outfmt 6 -task blastn -word_size 50");
+	print "Doing blast search of $spec against Brassicales_mitochondrial_genomes_NCBI.fa\n";
+	system ("blastn -query temp.fa -db Brassicales_mitochondrial_genomes_NCBI.fa -num_threads 24 -max_target_seqs 1 -out $sample.match.mitochondrial.genome.txt  -outfmt 6 -task blastn -word_size 50");
+}
+```
+#### BLAST results were merged for each species using the following command
+```bash
+for f in *chloroplast.genome.txt; do echo $f; cat $f ${f%%chloroplast.genome.txt}mitochondrial.genome.txt | awk '{print $1}' | sort | uniq > $f.reads.to.remove.txt; done
+```
+#### Strand direction descriptor (left or right) info was removed from each file
+```bash
+for f in 00_fastq_raw_reads/*R1.fastq; do echo $f; sed -i 's/1:N:0:.*+.*//g' $f; done
+for f in 00_fastq_raw_reads/*R2.fastq; do echo $f; sed -i 's/2:N:0:.*+.*//g' $f; done
+```
+#### Plastid reads were removed from fastq files: *note:filter.py script was written by user Tao on https://www.biostars.org/p/199946/
+```perl
+#!/usr/bin/perl
+use strict;
+use warnings;
+				
+#Making list of all the analized species
+open IN, "<", "readlist.filtering.txt";
+while (<IN>) 
+{	
+	chomp;
+    my ($left, $right, $remove, $r1, $r2) = split /\s+/, $_;
+	#print "$genome\n$reads\n";
+	#print "Next species in the list is $sample.\n";
+	my $filtered1 = $left;
+	$filtered1 =~ s/00_fastq_raw_reads\///;
+	my $filtered2 = $right;
+	$filtered2 =~ s/00_fastq_raw_reads\///;
+	
+	print "Cleaning file $left.\n";
+	system ("cat $left | python filter.py $remove > 02_fastq_filtered_reads/$filtered1.filtered.fastq");
+	
+	print "Cleaning file $right.\n";
+	system ("cat $right | python filter.py $remove > 02_fastq_filtered_reads/$filtered2.filtered.fastq");
+}
+close IN;
+```
+## B. Read pairing
+#### The following perl script was used to automate read pairing by pairfq.pl accross all species. *note: pairfq.pl script can be found at https://github.com/sestaton/Pairfq.
+```perl
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+open IN, "<", "readlist.filtered.txt";
+while (<IN>) 
+{
+	chomp;
+	my ($left, $right, $c01, $c03) = split /\s+/, $_;
+	my $pair1 = $left;
+	$pair1 =~ s/02_fastq_filtered_reads\///;
+	my $pair2 = $right;
+	$pair2 =~ s/02_fastq_filtered_reads\///;
+	print "Pairing files $left, $right\n";
+	system "perl ./pairfq.pl makepairs -f $left -r $right -fp $pair1.pair.fq -rp $pair2.pair.fq -fs $pair1.singleton.fq -rs $pair2.singleton.fq";
+}
+```
+## C. Read trimming using Trimmomatic
+```perl
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+open IN, "<", "readlist.filtered.txt";
+while (<IN>) 
+{
+	chomp;
+	my ($left, $right, $c01, $c03) = split /\s+/, $_;
+	$left =~ s/02_fastq_filtered_reads\///;
+	$right =~ s/02_fastq_filtered_reads\///;
+	print "working on cleaning file $left\n";
+	system "/home/aberic/00_Software/jre1.8.0_221/bin/java -jar /home/aberic/00_Software/Trimmomatic-0.39/trimmomatic-0.39.jar PE -threads 4 -phred64 $left.pair.fq $right.pair.fq $left.pairt.fq $left.singletont.fq $right.pairt.fq $right.singletont.fq ILLUMINACLIP:/home/aberic/00_Software/Trimmomatic-0.39/adapters/TruSeq3-PE.fa:2:30:10 LEADING:3 TRAILING:3 MINLEN:70";
+	# convert fastq to fasta
+	system "cat $left.pairt.fq | paste - - - - | cut -f1-2 | sed 's/^@/>/g' | tr '\t' '\n' > $left.pairt.fa";
+	system "cat $right.pairt.fq | paste - - - - | cut -f1-2 | sed 's/^@/>/g' | tr '\t' '\n' > $right.pairt.fa";
+}
+```
+## D. Repetitive element clustering and annotation with Transosome *note: Transposome can be found at https://github.com/sestaton/Transposome
+```perl
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+#Making list of all the analized species
+open IN, "<", "readlist.pairt.txt";
+while (<IN>) 
+{	
+	chomp;
+	my ($left, $right) = split /\s+/, $_;
+	my $sample = $left;
+	$sample =~ s/_R1.*//;
+	my $awk1 = '{ printf("%s",$0); n++; if(n%2==0) { printf("\n");} else { printf("\t\t");} }';
+	my $sed1 = 's/\t\t/\n/g';
+	my $awk2 = '{print $1 > "temp1.fa"; print $2 > "temp2.fa"}';
+	my $sed2 = 's/_/ /g';
+	print "\nWorking on $sample, sampling 250,000 random read pairs (500,000 reads).\n";
+	system "paste $left $right | awk '$awk1' | shuf | head -250000 | sed '$sed1' | awk '$awk2'";
+	system "sed -i '$sed2' temp1.fa";
+	system "sed -i '$sed2' temp2.fa";
+	system "python ./interleave.py temp1.fa temp2.fa > $sample.interleave.500k.random.fa";
+
+	#writing a new transposome_config.yml file
+	open my $config1, '>', "transposome_config.$sample.yml";
+	print $config1 "blast_input:\n  - sequence_file:    $sample.interleave.500k.random.fa\n  - sequence_format:   fasta\n  - thread:            12\n  - output_directory: 	03_500k_random/$sample.interleaved.filtered.500k.random.fa_PID90_COV55\nclustering_options:\n  - in_memory:         1\n  - percent_identity:  90\n  - fraction_coverage: 0.55\nannotation_input:\n  - repeat_database:  /home/aberic/03_Brassicales_RE/repbase_Viridiplantae.fa\nannotation_options:\n  - cluster_size:     100\n  - blast_evalue:     10\noutput:\n  - run_log_file:       $sample.interleaved.filtered.500k.random.fa.log\n  - cluster_log_file:   $sample.interleaved.filtered.500k.random.fa.cl.log";
+	close $config1;
+	system "transposome --config transposome_config.$sample.yml";
+	system "cp 03_500k_random/$sample.interleaved.filtered.500k.random.fa_PID90_COV55/$sample.interleaved.filtered.500k.random.fa.cl_annotations.tsv 03_500k_random/01_500k_random_results";	
+}
+close IN;
+```
+#### Transposome run information included in Appendix3 was extracted using a series of commands
+```bash
+for f in *_COV55; do grep "Total sequences:" $f/*random.fa.log > $f.total.txt; done
+for f in *_COV55; do grep "sequences clustered:" $f/*random.fa.log > $f.cluster.txt; done
+for f in *_COV55; do grep "(theoretical)" $f/*random.fa.log > $f.theorethical.txt; done
+for f in *_COV55; do grep "(biological)" $f/*random.fa.log > $f.biological.txt; done
+for f in *_COV55; do paste $f.total.txt $f.cluster.txt $f.theorethical.txt  $f.biological.txt > $f.temp; done
+for f in *temp; do awk '{print $0, FILENAME}' $f > $f.run.info.txt; done
+```
 # 3. Regression Analyses
 
 # 4. Hierarchical Clustering
