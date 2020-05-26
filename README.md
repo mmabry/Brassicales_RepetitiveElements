@@ -617,7 +617,8 @@ while (<IN>)
 	system "cat $right.pairt.fq | paste - - - - | cut -f1-2 | sed 's/^@/>/g' | tr '\t' '\n' > $right.pairt.fa";
 }
 ```
-## D. Repetitive element clustering and annotation with Transosome *note: Transposome can be found at https://github.com/sestaton/Transposome
+## D. Repetitive element clustering and annotation with Transosome
+#### Transposome can be found at https://github.com/sestaton/Transposome
 ```perl
 #!/usr/bin/perl
 use strict;
@@ -650,7 +651,7 @@ while (<IN>)
 }
 close IN;
 ```
-#### Transposome run information included in Appendix3 was extracted using a series of commands
+#### Transposome run information included in Appendix3 of the manuscript was extracted using a series of commands
 ```bash
 for f in *_COV55; do grep "Total sequences:" $f/*random.fa.log > $f.total.txt; done
 for f in *_COV55; do grep "sequences clustered:" $f/*random.fa.log > $f.cluster.txt; done
