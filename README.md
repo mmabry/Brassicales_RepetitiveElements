@@ -17,6 +17,10 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
   - [L. Final gene tree estimation](#l-finally-run-raxml-one-more-time-to-get-final-gene-trees)
   - [M. Species tree inference with ASTRAL](#m-Species-tree-inference-with-ASTRAL)
 - [2. Repetitive Element Clustering](#2-Repetitive-Element-Clustering)
+  - [A. Removal of mitochondrial and chloroplast reads](#a-Removal-of-mitochondrial-and-chloroplast-reads)
+  - [B. Read pairing](#b-Read-pairing)
+  - [C. Read trimming with Trimmomatic](#c-Read-trimming-with-Trimmomatic)
+  - [D. Repetitive element clustering and annotation with Transosome](#d-Repetitive-element-clustering-and-annotation-with-Transosome)
 - [3. Regression Analyses](#3-Regression-Analyses)
 - [4. Hierarchical Clustering](#4-Hierarchical-Clustering)
 - [5. Ultrametric Tree](#5-Ultrametric-Tree) 
@@ -593,7 +597,7 @@ while (<IN>)
 	system "perl ./pairfq.pl makepairs -f $left -r $right -fp $pair1.pair.fq -rp $pair2.pair.fq -fs $pair1.singleton.fq -rs $pair2.singleton.fq";
 }
 ```
-## C. Read trimming using Trimmomatic
+## C. Read trimming with Trimmomatic
 ```perl
 #!/usr/bin/perl
 use strict;
