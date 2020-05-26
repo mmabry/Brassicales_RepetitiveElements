@@ -29,6 +29,7 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
   - [C. Use TreePL to time calibrate phylogeny](#c-use-treepl-to-time-calibrate-phylogeny-httpsgithubcomblackrimtreeplwikiquick-run)
 - [6. Bayou](#6-bayou-httpsgithubcomuyedajbayoublobmastertutorialmd)
 - [7. Owie](#7-owie--example-from-from-httpwwwphytoolsorgcordoba2017ex10multi-regimehtml)
+- [8.Other plots](#8-Other-plots)
 
 
 
@@ -784,7 +785,7 @@ ggsave("Regression_plot.pdf", plot=acgrp, useDingbats=F)
 ```
 
 # 4. Hierarchical Clustering
-#### *note: You will need to run the "Data formating" code from "3. Regression analyses" section prior to proceeding.
+#### First run the "Data formating" code from "Regression analyses" section.
 ```R
 ###Load necessary packages
 library(ape)
@@ -812,7 +813,7 @@ pt<-as.dendrogram(rtree)
 cd<-as.dendrogram(consdend)
 dl<-dendlist(pt, cd)
 udl<-untangle(dl, method="step2side")
-pdf("Tanglegram_rotated_untangled.pdf", width = 10, height = 7)
+pdf("Tanglegram_rotated_untangled.pdf")
 tanglegram(dl, fast=T)
 dev.off()
 
@@ -837,7 +838,7 @@ btd<-as.dendrogram(bt)
 bl<-dendlist(btd, bd)
 ubl<-untangle(bl, method="step2side")
 tanglegram(ubl, fast=T)
-pdf("Tanglegram_Brassicaceae.pdf", width = 10, height = 7)
+pdf("Tanglegram_Brassicaceae.pdf")
 tanglegram(ubl, fast=T)
 dev.off()
 #Cleomaceae
@@ -856,7 +857,7 @@ cltd<-as.dendrogram(clt)
 cll<-dendlist(cltd, cld)
 ucl<-untangle(cll, method="step2side")
 tanglegram(ucl, fast=T)
-pdf("Tanglegram_Cleomaceae.pdf", width = 10, height = 7)
+pdf("Tanglegram_Cleomaceae.pdf")
 tanglegram(ucl, fast=T)
 dev.off()
 #Capparaceae
@@ -875,7 +876,7 @@ cpt<-rotate(cpt, 7)
 cptd<-as.dendrogram(cpt)
 cpl<-dendlist(cptd, cpd)
 tanglegram(cpl, fast=T)
-pdf("Tanglegram_Capparaceae.pdf", width = 10, height = 7)
+pdf("Tanglegram_Capparaceae.pdf")
 tanglegram(cpl, fast=T)
 dev.off()
 #NOTE:the 3 plots can be combined into single graph using plot_grid or other
@@ -1190,5 +1191,93 @@ names(ouwie_aicc)<-c("fitOUM","fitOU1","fitBM1", "fitBMS",  "fitOUMV", "fitOUMA"
 #determine which one is weighted highest for all tests run
 aic.w(ouwie_aicc)
 ```
+# 8. Other plots
+#### First run the "Data formating" code from "Regression analyses" section.
+```R
+library(scales)
+library(RColorBrewer)
+library(stats)
+library(ggtree)
+library(ape)
+library(ggstance)
+library(dendextend)
+library(phytools)
 
+###Supplemental Figure 1###
+#Phylogenetic tree, RE proportion by Superfamily and RE proportion by Order stacked bar plots
+#First make a bar plot showing proportion that each Superfamily of repetitive elements 
+#represents out of the total amount of annotated repetitive elements
+meltREfrac<-reshape2::melt(REfrac[,-c(2:4,ncol(REfrac))], variable.name = "RE_Superfamily", value.name = "RE_fraction")
+meltREfrac$RE_fraction<-meltREfrac$RE_fraction*100
+meltREfrac$RE_Superfamily<-factor(meltREfrac$RE_Superfamily, levels = REmeta$RE_Superfamily)
+meltREfrac$Species<-factor(meltREfrac$Species, levels = spec.ordered$Species)
+barcolours <- c(brewer.pal(name = "Paired", n = 12), brewer.pal(name = "Dark2", n = 6))
+sfplot<-ggplot(meltREfrac, aes(x=Species, y=RE_fraction, fill = RE_Superfamily))+
+  theme_bw()+
+  theme(axis.text.y = element_text(face = "italic", size = 6), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size=6), axis.text.x = element_text(size = 8))+
+  geom_bar(stat = "identity", position = "fill")+
+  scale_y_continuous(labels = percent_format(), expand = c(0,0))+
+  scale_x_discrete(limits = rev(levels(meltREfrac$Species)))+
+  scale_fill_manual(values = barcolours)+
+  coord_flip()+
+  labs(x= "", y= "Repetitive elements' proportion")+
+  guides(fill=guide_legend(reverse = T, override.aes = list(size=3)))
+#Then make a bar plot showing proportion that each type (DNA, LTR, non-LTR) of repetitive elements 
+#represents out of the total amount of annotated repetitive elements
+meltdf<-join(meltREfrac, REmeta, by="RE_Superfamily")
+meltdf<-aggregate(data=meltdf, RE_fraction~Species+Order, FUN=function(a)sum(a))
+meltdf$Species<-factor(meltdf$Species, levels = spec.ordered$Species)
+tricol<-brewer.pal(name = "Set2", n = 3)
+ordplot<-ggplot(meltdf, aes(x=Species, y=RE_fraction, fill = Order))+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        legend.position = "bottom", legend.title = element_blank(), axis.text.x = element_text(size = 8))+
+  geom_bar(stat = "identity", position = "fill")+
+  scale_y_continuous(labels = percent_format(), expand = c(0,0))+
+  scale_x_discrete(limits = rev(levels(meltdf$Species)))+
+  scale_fill_manual(values = tricol)+
+  coord_flip()+
+  labs(x= "", y= "Repetitive elements' proportion")+
+  guides(fill=guide_legend(reverse = T, nrow = 4, override.aes = list(size=3)))
+#Finally, plot the phylogenetic tree and assamble all 3 plots into a single graph
+tree <- read.tree("RepElem_Brassicales.new")
+phylodend<-as.dendrogram(tree)
+revdend<-rev(phylodend)
+revdend<-set(revdend, "branches_lwd", 0.2)
+revdend<-set(revdend, "labels_cex", 0.5)
+ggrev<-as.ggdend(revdend)
+phyloplot<-ggplot(ggrev, horiz = TRUE, theme = NULL, labels=T)+
+  theme_minimal()+
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.title.x = element_blank(), axis.title.y = element_blank(), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position = "bottom")
+phyloportplot<-plot_grid(phyloplot,sfplot, ordplot, labels=c(), nrow = 1, align="v")
+ggsave(plot = phyloportplot, filename = "Tree_REproportion_GS_plot.pdf")
 
+###Figure 1###
+#Make a plot that joins a phylogenetic tree, a repetitive element percent
+#genome fraction stacked bar graph, and a genome size lolli-plo
+tredf<-meltREfrac
+tredf$Species<-sub(" ","_", tredf$Species)
+tredf$RE_Superfamily<-factor(tredf$RE_Superfamily, levels = REmeta$RE_Superfamily)
+gen_size<-REfrac[,c("Species","Genome_Size_Mbp")]
+gen_size$Species<-sub(" ","_", gen_size$Species)
+barcolours <- c(brewer.pal(name = "Paired", n = 12), brewer.pal(name = "Dark2", n = 6))
+
+tr<- ggtree(tree)+
+  geom_tiplab(size=2, fontface='italic')
+
+tree_bar <- facet_plot(tr, panel = 'Repetitive elements percent genome fraction', data = tredf, geom = geom_barh, 
+                       mapping = aes(x=RE_fraction, fill = RE_Superfamily), stat='identity')+
+  ylim(0,75)+
+  xlim_tree(110)+
+  xlim_expand(xlim = c(0,50), panel = "Repetitive elements percent genome fraction")+
+  scale_fill_manual(values = barcolours)+
+  guides(fill=guide_legend(reverse = T))+
+  theme_tree2(legend.position = 'right', legend.text = element_text(size = 8), legend.title = element_text(size = 10))
+
+facet_plot(tree_bar, panel = 'Genome size (Mbp)', data = gen_size, geom = geom_pointrangeh, 
+           mapping = aes(x=Genome_Size_Mbp, xmin=0, xmax=Genome_Size_Mbp))
+
+ggsave("Tree_bargraph_genomesize.pdf")
+```
