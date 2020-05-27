@@ -29,7 +29,7 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
   - [C. Use TreePL to time calibrate phylogeny](#c-use-treepl-to-time-calibrate-phylogeny-httpsgithubcomblackrimtreeplwikiquick-run)
 - [6. Bayou](#6-bayou-httpsgithubcomuyedajbayoublobmastertutorialmd)
 - [7. Owie](#7-owie--example-from-from-httpwwwphytoolsorgcordoba2017ex10multi-regimehtml)
-- [8.Other plots](#8-Other-plots)
+- [8. Other plots](#8-Other-plots)
 
 
 
