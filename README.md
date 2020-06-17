@@ -670,6 +670,9 @@ library(plyr)
 library(stringr)
 library(ggplot2)
 library(cowplot)
+library(ape)
+library(phytools)
+library(nlme)
 #set working directory to the directory that contains *annotations_summary.tsv
 #Transposome output files and make a list of all the files
 setwd("A:/03-Brassicales RE analysis/")
@@ -725,60 +728,90 @@ write.csv(REfrac, file = "data.summary.csv", row.names = F)
 ```R
 ###Figure 2###
 #Linear regression analysis dot plot
-#Firstly, make a regression plot for all samples
 regdf<-REfrac[REfrac$Genome_Size_Mbp>0& REfrac$Genome_Size_Mbp<1300,]
-regdf$Total_RE<-regdf$Total_RE*100
-reg <- lm(Total_RE~Genome_Size_Mbp, data = regdf)
-intercept <- format(reg$coefficients[[1]],digits =3)
-slope<- format(reg$coefficients[[2]], digits = 3)
-r2<- format(summary(reg)$r.squared, digits =3)
-allrp<-ggplot(regdf, aes(x= Genome_Size_Mbp, y = Total_RE,col =Family))+geom_point(shape=19)+
-  geom_smooth(data=subset(regdf, Family=="Brassicaceae"|Family=="Capparaceae"|Family=="Cleomaceae"), se = F, method = "lm", linetype = "dashed")+
-  stat_smooth(method = "lm", size =1, col = "Black")+
+regdf[,5:ncol(regdf)]<-regdf[,5:ncol(regdf)]*100
+regdf<-regdf[-3,]
+regdf$Species<-sub(" ","_", regdf$Species)
+ultratree<-read.tree("A:/03-Brassicales RE analysis/BrassicalesRE.dated.tre")
+#Drop samples with genome size >1300Mb and samples without genome size information
+ut<-drop.tip(ultratree, c("Cleomella_serrulata", "Sisymbrium_brassiformis", "Cakile_maritima", "Farsetia_aegyptica", 
+                          "Schizopetalon_walheri", "Physaria_acutifolia", "Hesperis_matronalis", "Matthiola_longipetala"))
+spord<-as.data.frame(ut$tip.label)
+names(spord)<-"Species"
+regdf<-join(spord, regdf, by = "Species")
+rownames(regdf)<-regdf$Species
+
+pic<-cbind(as.data.frame(pic(regdf$Genome_Size_Mbp, ut)), as.data.frame(pic(regdf$Total_RE, ut)),as.data.frame(pic(regdf$Copia, ut)), 
+           as.data.frame(pic(regdf$Gypsy, ut)))
+names(pic)<-c("Genome_Size", "Total_RE", "Copia", "Gypsy")
+all<-lm(pic$Genome_Size~pic$Total_RE)
+copia<-lm(pic$Genome_Size~pic$Copia)
+gypsy<-lm(pic$Genome_Size~pic$Gypsy)
+  
+brdf<-regdf[regdf$Family=="Brassicaceae",]
+bt<-keep.tip(ut, as.vector(brdf$Species))
+bra<-cbind(as.data.frame(pic(brdf$Genome_Size_Mbp, bt)), as.data.frame(pic(brdf$Total_RE, bt)),as.data.frame(pic(brdf$Copia, bt)), 
+           as.data.frame(pic(brdf$Gypsy, bt)))
+names(bra)<-c("Genome_Size", "Total_RE", "Copia", "Gypsy")
+br.all<-lm(bra$Genome_Size~bra$Total_RE) 
+br.copia<-lm(bra$Genome_Size~bra$Copia)
+br.gypsy<-lm(bra$Genome_Size~bra$Gypsy)  
+
+cldf<-regdf[regdf$Family=="Cleomaceae",]
+clt<-keep.tip(ut, as.vector(cldf$Species))
+cle<-cbind(as.data.frame(pic(cldf$Genome_Size_Mbp, clt)), as.data.frame(pic(cldf$Total_RE, clt)),as.data.frame(pic(cldf$Copia, clt)), 
+           as.data.frame(pic(cldf$Gypsy, clt)))
+names(cle)<-c("Genome_Size", "Total_RE", "Copia", "Gypsy")
+cl.all<-lm(cle$Genome_Size~cle$Total_RE) 
+cl.copia<-lm(cle$Genome_Size~cle$Copia)
+cl.gypsy<-lm(cle$Genome_Size~cle$Gypsy)
+
+cpdf<-regdf[regdf$Family=="Capparaceae",]
+cpt<-keep.tip(ut, as.vector(cpdf$Species))
+cap<-cbind(as.data.frame(pic(cpdf$Genome_Size_Mbp, cpt)), as.data.frame(pic(cpdf$Total_RE, cpt)),as.data.frame(pic(cpdf$Copia, cpt)), 
+           as.data.frame(pic(cpdf$Gypsy, cpt)))
+names(cap)<-c("Genome_Size", "Total_RE", "Copia", "Gypsy")
+cp.all<-lm(cap$Genome_Size~cap$Total_RE) 
+cp.copia<-lm(cap$Genome_Size~cap$Copia)
+cp.gypsy<-lm(cap$Genome_Size~cap$Gypsy)
+
+allplot<-ggplot()+
+  geom_point(data = pic, aes(x=Total_RE, y=Genome_Size))+
+  geom_abline(slope=all$coefficients[[2]], intercept=all$coefficients[[1]])+
+  geom_abline(slope=br.all$coefficients[[2]], intercept=br.all$coefficients[[1]], colour="red")+
+  geom_abline(slope=cl.all$coefficients[[2]], intercept=cl.all$coefficients[[1]], colour="green")+
+  geom_abline(slope=cp.all$coefficients[[2]], intercept=cp.all$coefficients[[1]], colour="blue")+
   theme_bw()+
-  theme(axis.title.x = element_text(size=10), axis.title.y = element_text(size=10))+
-  xlab("Genome size (Mbp)")+ 
-  ylab("Repetitive elements' genome fraction (%)")+
-  scale_x_continuous(breaks = seq(0, 1500, by = 100))
-#Then, make regression plots for Copia or Gypsy elements
-resf<-split(do.call(rbind,samplelist), do.call(rbind,samplelist)$RE_Superfamily)
-resf<-lapply(resf, function(a)setDT(a, keep.rownames = "Species"))
-resf.format<-function(df)
-{
-  df[,"GenomeFraction"]<-df[,"GenomeFraction"]*100
-  df$Species<-sub("*\\.[0-9]","", df$Species)
-  sf<-unique(df$RE_Superfamily)
-  df<-join(metadata, df, by="Species")
-  df$RE_Superfamily<-rep(sf, nrow(df))
-  df[is.na(df)]<-0
-  return(df)
-}
-resf<-lapply(resf,resf.format)
-cp<-resf$Copia
-cp<-cp[cp$Genome_Size_Mbp>0 & cp$Genome_Size_Mbp<1300,]
-copiarp<- ggplot(cp, aes(x= Genome_Size_Mbp, y = GenomeFraction,col=Family))+geom_point(shape=19)+
-  geom_smooth(data=subset(cp, Family=="Brassicaceae"|Family=="Capparaceae"|Family=="Cleomaceae"), se = F, method = "lm", linetype = "dashed")+
-  stat_smooth(method = "lm", size =1, col = "Black")+
-  theme_bw()+ 
+  scale_x_continuous(breaks=seq(-2, 4, by=2))+
+  xlab("PIC of TE genome fractions")+
+  ylab("PIC of genome sizes")
+
+cplot<-ggplot()+
+  geom_point(data = pic, aes(x=Copia, y=Genome_Size))+
+  geom_abline(slope=copia$coefficients[[2]], intercept=copia$coefficients[[1]])+
+  geom_abline(slope=br.copia$coefficients[[2]], intercept=br.copia$coefficients[[1]], colour="red")+
+  geom_abline(slope=cl.copia$coefficients[[2]], intercept=cl.copia$coefficients[[1]], colour="green")+
+  geom_abline(slope=cp.copia$coefficients[[2]], intercept=cp.copia$coefficients[[1]], colour="blue")+
+  theme_bw()+
   theme(legend.position = "none", axis.title.x = element_text(size=10), axis.title.y = element_text(size=10))+
-  xlab("Genome size (Mbp)")+ 
-  ylab("Repetitive elements' genome fraction (%)")+
-  scale_x_continuous(breaks = seq(0, 1500, by = 100))
-gp<-resf$Gypsy 
-gp<-gp[gp$Genome_Size_Mbp>0 & gp$Genome_Size_Mbp<1300,]
-gypsyrp<-ggplot(gp, aes(x= Genome_Size_Mbp, y = GenomeFraction,col=Family))+geom_point(shape=19)+
-  geom_smooth(data=subset(gp, Family=="Brassicaceae"|Family=="Capparaceae"|Family=="Cleomaceae"), se = F, method = "lm", linetype = "dashed")+
-  stat_smooth(method = "lm", size =1, col = "Black")+
-  theme_bw()+ 
+  xlab("PIC of Copia genome fractions")+
+  ylab("PIC of genome sizes")
+
+gplot<-ggplot()+
+  geom_point(data = pic, aes(x=Gypsy, y=Genome_Size))+
+  geom_abline(slope=gypsy$coefficients[[2]], intercept=gypsy$coefficients[[1]])+
+  geom_abline(slope=br.gypsy$coefficients[[2]], intercept=br.gypsy$coefficients[[1]], colour="red")+
+  geom_abline(slope=cl.gypsy$coefficients[[2]], intercept=cl.gypsy$coefficients[[1]], colour="green")+
+  geom_abline(slope=cp.gypsy$coefficients[[2]], intercept=cp.gypsy$coefficients[[1]],colour="blue")+
+  theme_bw()+
   theme(legend.position = "none", axis.title.x = element_text(size=10), axis.title.y = element_text(size=10))+
-  xlab("Genome size (Mbp)")+ 
-  ylab("Repetitive elements' genome fraction (%)")+
-  scale_x_continuous(breaks = seq(0, 1500, by = 100))
-#Combine Copia and Gypsi plot into a two apannel graph
-cgrp<-plot_grid(copiarp, gypsyrp, labels = c("B", "C"), nrow = 1)
-#Finally, combine all the plots into the final graph
-acgrp<-plot_grid(allrp, cgrp, labels = c("A"), ncol = 1)
-ggsave("Regression_plot.pdf", plot=acgrp, useDingbats=F)
+  xlab("PIC of Gypsy genome fractions")+
+  ylab("PIC of genome sizes")
+
+cgplot<-plot_grid(cplot, gplot, labels = c("B", "C"), nrow = 1)
+regplot<-plot_grid(allplot, cgplot, labels = c("A"), ncol = 1)
+ggsave("Regression_plot_PIC.pdf", plot=regplot, 
+       width = 10, height = 7, units = "in", dpi = 300, useDingbats=F)
 ```
 
 # 4. Hierarchical Clustering
