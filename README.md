@@ -21,15 +21,27 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
   - [B. Read pairing](#b-Read-pairing)
   - [C. Read trimming with Trimmomatic](#c-Read-trimming-with-Trimmomatic)
   - [D. Repetitive element clustering and annotation with Transosome](#d-Repetitive-element-clustering-and-annotation-with-Transosome)
-- [3. Regression Analyses](#3-Regression-Analyses)
-- [4. Hierarchical Clustering](#4-Hierarchical-Clustering)
-- [5. Ultrametric Tree](#5-Ultrametric-Tree) 
+- [3. Tandem repeat content estimation] (#3-Tandem-repeat-content-estimation)
+  - [A. PRICE assembly]
+  - [B. Tandem repeat finder (TRF) using resulting contigs]
+  - [C. convert .dat file to .fasta file of annotaed TRs]
+  - [D. Index fasta file in BWA and map reads]
+  - [E. Get mapping stats in samtools]
+- [4. Gene content estimation]
+  - [A. Interleave paired reads to prepare them for blastx]
+  - [B. Download BUSCO set of genes for Brassicales]
+  - [C. Using the ancestral FASTA file containing the consensus ancestral sequences for each BUSCO make a blast database]
+  - [D. Run blastx]
+  - [E. Modify headers and get mapping stats in samtools]
+- [5. Regression Analyses](#5-Regression-Analyses)
+- [6. Hierarchical Clustering](#6-Hierarchical-Clustering)
+- [7. Ultrametric Tree](#7-Ultrametric-Tree) 
   - [A. Concatenate alignments](#a-concatenate-alignments-using-the-concatenate_matricespy-script-from-httpsbitbucketorgwashjaketranscriptome_phylogeny_toolssrcmaster)
   - [B. Run RAxML to optimize Branch lengths](#b-run-raxml-to-optimize-branch-lengths-and-model-parameters-using-the-concatenated-alignment-and-astral-phylogeny-as-a-fixed-input-tree)
   - [C. Use TreePL to time calibrate phylogeny](#c-use-treepl-to-time-calibrate-phylogeny-httpsgithubcomblackrimtreeplwikiquick-run)
-- [6. Bayou](#6-bayou-httpsgithubcomuyedajbayoublobmastertutorialmd)
-- [7. Owie](#7-owie--example-from-from-httpwwwphytoolsorgcordoba2017ex10multi-regimehtml)
-- [8. Other plots](#8-Other-plots)
+- [8. Bayou](#8-bayou-httpsgithubcomuyedajbayoublobmastertutorialmd)
+- [9. Owie](#9-owie--example-from-from-httpwwwphytoolsorgcordoba2017ex10multi-regimehtml)
+- [10. Other plots](#10-Other-plots)
 
 
 
@@ -661,7 +673,327 @@ for f in *_COV55; do grep "(biological)" $f/*random.fa.log > $f.biological.txt; 
 for f in *_COV55; do paste $f.total.txt $f.cluster.txt $f.theorethical.txt  $f.biological.txt > $f.temp; done
 for f in *temp; do awk '{print $0, FILENAME}' $f > $f.run.info.txt; done
 ```
-# 3. Regression Analyses
+# 3. Tandem repeat content estimation 
+## A. PRICE assembly (http://derisilab.ucsf.edu/software/price/)
+### seed sequences from ftp://ftp.ensemblgenomes.org/pub/plants/release-50/fasta/arabidopsis_thaliana/cdna/Arabidopsis_thaliana.TAIR10.cdna.all.fa.gz
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J price  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+
+temp=$(echo $1 | awk -F. '{print $1}')
+
+PREFIX=${temp::-3}
+
+#echo $PREFIX
+
+
+mkdir /group/pireslab/mmabry_hpc/Brassicales/RepElem/PRICE/PRICE_assembly/$PREFIX
+
+
+/group/pireslab/mmabry_hpc/Brassicales/RepElem/PRICE/PriceSource140408/PriceTI \
+	-fpp ${PREFIX}_R1.fastq_sequence.txt ${PREFIX}_R2.fastq_sequence.txt 300 95 \
+	-icf /group/pireslab/mmabry_hpc/Brassicales/RepElem/PRICE/Arabidopsis_thaliana.TAIR10.cdna.all.fa 1 1 5 \
+	-nc 30 \
+	-dbmax 72 \
+	-tpi 85 \
+	-tol 20 \
+	-mol 30 \
+	-mpi 85 \
+	-o /group/pireslab/mmabry_hpc/Brassicales/RepElem/PRICE/PRICE_assembly/${PREFIX}/${PREFIX}.fasta
+
+```
+## B. Tandem repeat finder (TRF) using resulting contigs (https://tandem.bu.edu/trf/trf.unix.help.html)
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J trf  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+
+#echo $PREFIX
+
+mkdir $PREFIX  
+
+cd $PREFIX
+
+/group/pireslab/mmabry_hpc/Brassicales/RepElem/TandemRepeatFinder/TRF/build/src/trf ../${1} 2 7 7 80 10 50 500 -f -d -m
+```
+## C. convert .dat file to .fasta file of annotaed TRs
+```python
+#!/usr/bin/python3
+# author: Makenzie Mabry
+# date: 3/2/21
+"""This script takes the *.dat file from tandem repeat finder and makes a fasta file of all annoated tandem repeats
+Usage:
+    TR_sequences.py file.dat
+"""
+# Importing modules
+import sys
+
+
+# Open file
+f = open(sys.argv[1])
+
+#start count
+count = 0
+
+# Loop over each line in the file
+for line in f.readlines():
+
+	# Strip the line to remove whitespace
+	line =line.strip()
+
+	# Split the line
+	parts = line.split(" ")
+
+	# Check length of parts
+	if len(parts) == 15:
+		print(f'>repeat_{count}')
+		print(parts[-1])
+		count += 1
+
+```
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J TR  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+python3 TR_sequences.py $1 > ${PREFIX}.TR.fasta
+```
+## D. Index fasta file in BWA and map reads (http://bio-bwa.sourceforge.net/)
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5  # partition
+#SBATCH -J BWA  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load bwa/bwa-0.7.17
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+bwa index ${PREFIX}.TR.fasta
+```
+```bash 
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5  # partition
+#SBATCH -J BWA  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load bwa/bwa-0.7.17
+module load samtools/samtools-1.9 
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+bwa mem -t 14 -R "@RG\tID:${PREFIX}\tSM:${PREFIX}" ${PREFIX}.TR.fasta \
+    /group/pireslab/mmabry_hpc/Brassicales/RepElem/Beric_filteredGSS/PairedReads/98_fastq_trimmed_paired_reads/${PREFIX}_R1.fastq.filtered.fastq.pairt.fq /group/p
+ireslab/mmabry_hpc/Brassicales/RepElem/Beric_filteredGSS/PairedReads/98_fastq_trimmed_paired_reads/${PREFIX}_R2.fastq.filtered.fastq.pairt.fq | \
+    samtools view -b - > bam/${PREFIX}.raw.bam
+```
+## E. Get mapping stats in samtools (http://www.htslib.org/doc/samtools-flagstat.html)
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J Diamond_2  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load samtools/samtools-1.9
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+samtools flagstat $1 > ${PREFIX}.mapstat.txt
+```
+# 4. Gene content estimation
+## A. Interleave paired reads to prepare them for blastx
+```python
+#!/usr/bin/python
+# encoding:utf8
+# author: Makenzie Mabry (Modified from Sébastien Boisvert)
+"""This script takes two fasta files and interleaves them
+Usage:
+    interleave-fasta.py fasta_file1 fasta_file2
+"""
+# Importing modules
+import sys
+# Main
+if __name__ == '__main__':
+    try:
+        file1 = sys.argv[1]
+        file2 = sys.argv[2]
+    except:
+        print __doc__
+        sys.exit(1)
+    with open(file1) as f1:
+        with open(file2) as f2:
+            while True:
+	            line = f1.readline()
+	            if line.strip() == "":
+		            break     
+	            print line.strip()
+	            print f1.readline().strip()
+                    print f1.readline().strip()
+                    print f1.readline().strip()
+	            print f2.readline().strip()
+	            print f2.readline().strip()
+                    print f2.readline().strip()
+                    print f2.readline().strip()
+
+```
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J price  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+
+temp=$(echo $1 | awk -F. '{print $1}')
+
+PREFIX=${temp::-3}
+
+#echo $PREFIX
+
+
+
+python2 interleave.py ${PREFIX}_R1.fastq.filtered.fastq.pairt.fq ${PREFIX}_R2.fastq.filtered.fastq.pairt.fq > ${PREFIX}_interl.fq 
+```
+## B. Download BUSCO set of genes for Brassicales from https://busco-data.ezlab.org/v5/data/lineages/brassicales_odb10.2020-08-05.tar.gz
+
+## C. Using the ancestral FASTA file containing the consensus ancestral sequences for each BUSCO make a blast database
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J Diamond_1  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load ircf/ircf-modules 
+module load diamond/diamond-0.9.22
+
+export PATH=/home/mmabry/software/:$PATH #this is for running diamond
+
+
+diamond makedb --in Brassicales_BUSCO_ancestral.fa -d Brassicales_BUSCO_ancestral
+```
+## D. Run blastx 
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J Diamond_2  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load ircf/ircf-modules 
+module load diamond/diamond-0.9.22
+
+export PATH=/home/mmabry/software/:$PATH #this is for running diamond
+
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+diamond blastx -q $1 -d /group/pireslab/mmabry_hpc/Brassicales/RepElem/BUSCO/Brassicales_BUSCO_ancestral -f 101 -o ${PREFIX}.sam
+```
+## E. Modify headers and get mapping stats in samtools (http://www.htslib.org/doc/samtools-flagstat.html)
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J Diamond_2  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load samtools/samtools-1.9
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+samtools faidx /group/pireslab/mmabry_hpc/Brassicales/RepElem/BUSCO/Brassicales_BUSCO_ancestral.fa
+
+samtools view -bt /group/pireslab/mmabry_hpc/Brassicales/RepElem/BUSCO/Brassicales_BUSCO_ancestral.fa.fai $1 > ${PREFIX}.bam
+```
+```bash
+#! /bin/bash
+
+#SBATCH -p BioCompute,hpc5,Lewis  # partition
+#SBATCH -J Diamond_2  # give the job a custom name
+#SBATCH -o results-%j.out  # give the job output a custom name
+#SBATCH -t 2-00:00:00  # two day time limit
+
+#SBATCH -N 1  # number of nodes
+#SBATCH -n 14  # number of cores (AKA tasks)
+#SBATCH --mem=80000 #memory
+
+module load samtools/samtools-1.9
+
+PREFIX=$(echo $1 | awk -F. '{print $1}')
+
+samtools flagstat $1 > ${PREFIX}.mapstat.txt
+```
+
+# 5. Regression Analyses
 #### Data formating:
 ```R
 ###Load necessary packages
@@ -814,7 +1146,7 @@ ggsave("Regression_plot_PIC.pdf", plot=regplot,
        width = 10, height = 7, units = "in", dpi = 300, useDingbats=F)
 ```
 
-# 4. Hierarchical Clustering
+# 6. Hierarchical Clustering
 #### First run the "Data formating" code from "Regression analyses" section.
 ```R
 ###Load necessary packages
@@ -913,7 +1245,7 @@ dev.off()
 #functions, but we combined them manually in Adobe Illustrator
 ```
 
-# 5. Ultrametric Tree 
+# 7. Ultrametric Tree 
 ## A. Concatenate alignments using the 'concatenate_matrices.py' script from https://bitbucket.org/washjake/transcriptome_phylogeny_tools/src/master/ 
 ```bash
 #! /bin/bash
@@ -972,7 +1304,7 @@ optcvad = 2
 moredetailcvad
 ```
 
-# 6. Bayou https://github.com/uyedaj/bayou/blob/master/tutorial.md
+# 8. Bayou https://github.com/uyedaj/bayou/blob/master/tutorial.md
 ```R
 install_github("uyedaj/bayou")
 library(bayou)
@@ -1068,7 +1400,7 @@ plotBranchHeatMap(tree, chainOU, "theta", burnin = 0.3, pal = viridis, edge.widt
 phenogram.density(tree, dat, burnin = 0.3, chainOU, pp.cutoff = 0.3)
 ```
 
-# 7. Owie : Example from from http://www.phytools.org/Cordoba2017/ex/10/Multi-regime.html
+# 9. Owie : Example from from http://www.phytools.org/Cordoba2017/ex/10/Multi-regime.html
 ```R
 library(phytools)
 ```
@@ -1221,7 +1553,7 @@ names(ouwie_aicc)<-c("fitOUM","fitOU1","fitBM1", "fitBMS",  "fitOUMV", "fitOUMA"
 #determine which one is weighted highest for all tests run
 aic.w(ouwie_aicc)
 ```
-# 8. Other plots
+# 10. Other plots
 #### First run the "Data formating" code from "Regression analyses" section.
 ```R
 ###Load necessary packages
