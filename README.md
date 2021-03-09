@@ -21,18 +21,18 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
   - [B. Read pairing](#b-Read-pairing)
   - [C. Read trimming with Trimmomatic](#c-Read-trimming-with-Trimmomatic)
   - [D. Repetitive element clustering and annotation with Transosome](#d-Repetitive-element-clustering-and-annotation-with-Transosome)
-- [3. Tandem repeat content estimation] (#3-tandem-repeat-content-estimation)
-  - [A. PRICE assembly]
-  - [B. Tandem repeat finder (TRF) using resulting contigs]
-  - [C. convert .dat file to .fasta file of annotaed TRs]
-  - [D. Index fasta file in BWA and map reads]
-  - [E. Get mapping stats in samtools]
-- [4. Gene content estimation]
-  - [A. Interleave paired reads to prepare them for blastx]
-  - [B. Download BUSCO set of genes for Brassicales]
-  - [C. Using the ancestral FASTA file containing the consensus ancestral sequences for each BUSCO make a blast database]
-  - [D. Run blastx]
-  - [E. Modify headers and get mapping stats in samtools]
+- [3. Tandem repeat content estimation](#3-tandem-repeat-content-estimation)
+  - [A. PRICE assembly](#a-price-assembly)
+  - [B. Tandem repeat finder (TRF) using resulting contigs](#b-tandem-repeat-finder-TRF-using-resulting-contigs)
+  - [C. convert .dat file to .fasta file of annotaed TRs](#c-convert-.dat-file-to-.fasta-file-of-annotaed-TRs)
+  - [D. Index fasta file in BWA and map reads](#d-index-fasta-file-in-BWA-and-map-reads)
+  - [E. Get mapping stats in samtools](#e-get-mapping-stats-in-samtools)
+- [4. Gene content estimation](#4-gene-content-estimation)
+  - [A. Interleave paired reads to prepare them for blastx](#a-interleave-paired-reads-to-prepare-them-for-blastx)
+  - [B. Download BUSCO set of genes for Brassicales](#b-download-BUSCO-set-of-genes-for-Brassicales)
+  - [C. Using the ancestral FASTA file containing the consensus ancestral sequences for each BUSCO make a blast database](#c-using-the-ancestral-FASTA-file-containing-the-consensus-ancestral-sequences-for-each-BUSCO-make-a-blast-database)
+  - [D. Run blastx](#d-run-blastx)
+  - [E. Modify headers and get mapping stats in samtools](#e-modify-headers-and-get-mapping-stats-in-samtools)
 - [5. Regression Analyses](#5-Regression-Analyses)
 - [6. Hierarchical Clustering](#6-Hierarchical-Clustering)
 - [7. Ultrametric Tree](#7-Ultrametric-Tree) 
