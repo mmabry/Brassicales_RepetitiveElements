@@ -21,7 +21,7 @@ Scripts used for Repetitive element content not correlated with whole-genome dup
   - [B. Read pairing](#b-Read-pairing)
   - [C. Read trimming with Trimmomatic](#c-Read-trimming-with-Trimmomatic)
   - [D. Repetitive element clustering and annotation with Transosome](#d-Repetitive-element-clustering-and-annotation-with-Transosome)
-- [3. Tandem repeat content estimation] (#3-Tandem-repeat-content-estimation)
+- [3. Tandem repeat content estimation] (#3-tandem-repeat-content-estimation)
   - [A. PRICE assembly]
   - [B. Tandem repeat finder (TRF) using resulting contigs]
   - [C. convert .dat file to .fasta file of annotaed TRs]
