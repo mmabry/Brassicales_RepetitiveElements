@@ -1,5 +1,5 @@
 ## Brassicales_RepetitiveElements
-Scripts used for Repetitive element content not correlated with whole-genome duplication or reflect phylogeny in the Brassicales (In prep)
+Scripts used for Beric A & ME Mabry et al. (2021). Comparative phylogenetics of repetitive elements in a diverse order of flowering plants (Brassicales). G3 Genes| Genomes| Genetics. https://doi.org/10.1093/g3journal/jkab140
 
 # Table of contents
 - [1. Phylogeny](#1-phylogeny)
